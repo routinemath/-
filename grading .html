@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>📝 자가채점</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  margin: 0; padding: 0;
+  font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  background: #f0f2f5; min-height: 100vh;
+}
+
+/* ── 헤더 ── */
+.header {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white; padding: 16px 16px 12px; text-align: center;
+}
+.header h1 { margin: 0 0 4px; font-size: 18px; }
+.header p  { margin: 0; font-size: 12px; opacity: .8; }
+
+/* ── 문제 카드 ── */
+.problem-wrap { padding: 12px 12px 120px; max-width: 480px; margin: 0 auto; }
+
+.card {
+  background: white; border-radius: 12px; padding: 14px 14px 10px;
+  margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
+  border-left: 4px solid #ddd; transition: border-color .3s, background .3s;
+}
+.card.correct { border-left-color: #4CAF50; background: #f0fff4; }
+.card.wrong   { border-left-color: #f44336; background: #fff5f5; }
+.card-num { font-weight: bold; font-size: 13px; color: #555; margin-bottom: 8px; }
+
+/* ── 수식 퀵버튼 바 ── */
+.quick-bar {
+  display: flex; gap: 5px; overflow-x: auto; padding: 0 0 6px;
+  scrollbar-width: none; margin-bottom: 6px;
+}
+.quick-bar::-webkit-scrollbar { display: none; }
+.qb {
+  flex-shrink: 0; padding: 5px 10px;
+  background: #eef0fb; border: 1px solid #c5caf5;
+  border-radius: 20px; font-size: 14px; cursor: pointer;
+  color: #3949ab; font-weight: 500; white-space: nowrap;
+  user-select: none; transition: background .1s;
+}
+.qb:active { background: #c5caf5; }
+
+/* ── 답 입력창 ── */
+.input-row { display: flex; gap: 8px; align-items: center; }
+.ans-input {
+  flex: 1; padding: 10px 12px; font-size: 16px;
+  border: 2px solid #ddd; border-radius: 8px; outline: none;
+  transition: border-color .2s; background: white;
+  -webkit-user-select: text;
+}
+.ans-input:focus   { border-color: #667eea; }
+.ans-input[disabled] { background: #fafafa; color: #333; }
+.result-icon { font-size: 22px; min-width: 28px; text-align: center; }
+
+/* ── 입력 예시 ── */
+.input-hint {
+  margin-top: 6px; padding: 6px 10px;
+  background: #fffde7; border-radius: 6px;
+  font-size: 11px; color: #888; line-height: 1.8;
+  border-left: 3px solid #ffe082;
+}
+.input-hint strong { color: #f57f17; }
+
+/* ── 채점 버튼 ── */
+#submit-bar {
+  position: fixed; bottom: 0; left: 0; width: 100%;
+  padding: 10px 16px 16px; background: white;
+  border-top: 1px solid #eee; z-index: 90;
+}
+#submit-bar button {
+  width: 100%; padding: 14px; font-size: 16px; font-weight: bold;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white; border: none; border-radius: 10px; cursor: pointer;
+}
+
+/* ── 결과 화면 ── */
+#result-screen {
+  display: none; max-width: 480px; margin: 0 auto;
+  padding: 20px 16px 40px; text-align: center;
+}
+.score-circle {
+  width: 130px; height: 130px; border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  margin: 0 auto 16px; box-shadow: 0 6px 20px rgba(102,126,234,.4);
+}
+.score-num   { font-size: 42px; font-weight: bold; color: white; line-height: 1; }
+.score-label { font-size: 13px; color: rgba(255,255,255,.8); margin-top: 3px; }
+.score-msg   { font-size: 20px; font-weight: bold; margin: 0 0 16px; }
+.result-list { text-align: left; background: white; border-radius: 12px; padding: 4px 16px; margin-bottom: 16px; }
+.result-row  { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+.result-row:last-child { border-bottom: none; }
+.tag-ok { color: #4CAF50; font-weight: bold; }
+.tag-ng { color: #f44336; font-weight: bold; }
+.btn-retry {
+  width: 100%; padding: 14px; font-size: 15px; background: #FF9800;
+  color: white; border: none; border-radius: 10px; cursor: pointer;
+}
+#save-notice { font-size: 12px; color: #888; margin-top: 12px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1 id="hTitle">📝 자가채점</h1>
+  <p  id="hSub">로딩 중...</p>
+</div>
+
+<div id="loading" style="padding:60px 20px;text-align:center;color:#888;">
+  <div style="font-size:40px;margin-bottom:12px;">⏳</div>
+  <div>문제를 불러오는 중...</div>
+</div>
+<div id="error" style="display:none;padding:60px 20px;text-align:center;color:#e53935;">
+  <div style="font-size:40px;margin-bottom:12px;">⚠️</div>
+  <div id="errorMsg">문제를 불러올 수 없습니다.</div>
+  <div style="font-size:12px;color:#aaa;margin-top:8px;">URL을 확인하거나 선생님께 문의하세요.</div>
+</div>
+
+<div id="main" style="display:none;">
+  <div class="problem-wrap" id="problemWrap"></div>
+  <div id="submit-bar"><button onclick="submitAll()">✅ 채점하기</button></div>
+</div>
+
+<div id="result-screen">
+  <div class="score-circle">
+    <div class="score-num"  id="rScore"></div>
+    <div class="score-label" id="rTotal"></div>
+  </div>
+  <div class="score-msg" id="rMsg"></div>
+  <div class="result-list" id="rList"></div>
+  <button class="btn-retry" onclick="retryAll()">🔄 다시 풀기</button>
+  <p id="save-notice"></p>
+</div>
+
+<script>
+let examData = null;
+
+// ── 초기화 ──────────────────────────────────
+(async function init() {
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { showError('QR 코드에 문제 ID가 없습니다.'); return; }
+  const base = location.href.replace(/\/grading\.html.*$/, '');
+  try {
+    const res = await fetch(base + '/answers/' + id + '.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    examData = await res.json();
+    examData._id   = id;
+    examData._base = base;
+    renderProblems();
+  } catch(e) {
+    showError('문제 파일을 불러올 수 없습니다.<br><small>' + e.message + '</small>');
+  }
+})();
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('error').style.display   = 'block';
+  document.getElementById('errorMsg').innerHTML    = msg;
+}
+
+// ── 퀵버튼 정의 ─────────────────────────────
+// [표시 라벨, 삽입 문자열]
+const QUICK_BTNS = [
+  ['①','①'], ['②','②'], ['③','③'], ['④','④'], ['⑤','⑤'],
+  ['√ ','√'], ['^','^ '],  ['/','/ '],
+  ['x','x'],  ['y','y'],  ['n','n'],  ['a','a'],
+  ['π','π'],  ['²','²'],  ['³','³'],
+  ['(','('],  [')',')'  ],
+  ['+','+'],['-','-'],['×','×'],
+  ['≤','≤'],['≥','≥'],['≠','≠'],
+];
+
+// ── 문제 렌더링 ──────────────────────────────
+function renderProblems() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('hTitle').textContent = '📝 ' + examData.title;
+  document.getElementById('hSub').textContent   = examData.student + ' | ' + (examData.date || '');
+
+  const wrap = document.getElementById('problemWrap');
+  wrap.innerHTML = '';
+
+  examData.problems.forEach(p => {
+    // 퀵버튼 바 HTML
+    const qbHTML = QUICK_BTNS.map(([label, val]) =>
+      `<button class="qb" onclick="insertQuick('inp_${p.number}','${val.replace(/'/g,"\\'")}')">
+        ${label}
+      </button>`
+    ).join('');
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = 'card_' + p.number;
+    card.innerHTML = `
+      <div class="card-num">문제 ${p.number}번</div>
+      <div class="quick-bar">${qbHTML}</div>
+      <div class="input-row">
+        <input class="ans-input" id="inp_${p.number}"
+          type="text" inputmode="text"
+          placeholder="답을 입력하세요"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <span class="result-icon" id="icon_${p.number}"></span>
+      </div>
+      <div class="input-hint">
+        💡 <strong>입력 예시</strong> &nbsp;
+        분수: <strong>3/4</strong> &nbsp;|&nbsp;
+        루트: <strong>√3</strong> &nbsp;|&nbsp;
+        거듭제곱: <strong>x^2</strong>, <strong>x^3</strong> &nbsp;|&nbsp;
+        혼합: <strong>2√3</strong>, <strong>1/√2</strong>, <strong>3x^2+1</strong>
+      </div>`;
+    wrap.appendChild(card);
+  });
+
+  document.getElementById('main').style.display = 'block';
+}
+
+// ── 퀵버튼 삽입 ─────────────────────────────
+function insertQuick(inputId, val) {
+  const el = document.getElementById(inputId);
+  if (!el || el.disabled) return;
+  el.focus();
+  // selectionStart/End로 커서 위치에 삽입
+  const start = el.selectionStart ?? el.value.length;
+  const end   = el.selectionEnd   ?? el.value.length;
+  const v = el.value;
+  el.value = v.slice(0, start) + val + v.slice(end);
+  const pos = start + val.length;
+  el.setSelectionRange(pos, pos);
+  // 포커스 유지 (모바일 키보드 유지)
+  setTimeout(() => el.focus(), 0);
+}
+
+// ── 정규화 ──────────────────────────────────
+function norm(s) {
+  if (!s && s !== 0) return '';
+  return s.toString().trim().toLowerCase()
+    .replace(/\s+/g, '')
+    // 지수 표기 통일: x^2 ↔ x², x^3 ↔ x³
+    .replace(/\^2/g, '²').replace(/\^3/g, '³')
+    .replace(/×/g,'*').replace(/÷/g,'/')
+    .replace(/[（(]/g,'(').replace(/[）)]/g,')')
+    .replace(/[，,]/g,',').replace(/－/g,'-').replace(/＋/g,'+')
+    .replace(/①/g,'1').replace(/②/g,'2').replace(/③/g,'3')
+    .replace(/④/g,'4').replace(/⑤/g,'5');
+}
+
+// ── 채점 ────────────────────────────────────
+function submitAll() {
+  if (!examData) return;
+
+  let correct = 0;
+  let listHTML = '';
+  const resultData = [];
+
+  examData.problems.forEach(p => {
+    const inp  = document.getElementById('inp_'  + p.number);
+    const card = document.getElementById('card_' + p.number);
+    const icon = document.getElementById('icon_' + p.number);
+
+    const userAns = inp ? inp.value.trim() : '';
+    const corrAns = p.answer || '';
+    const ok = corrAns && norm(userAns) === norm(corrAns);
+
+    if (ok) correct++;
+    card.className   = 'card ' + (ok ? 'correct' : 'wrong');
+    icon.textContent = ok ? '✅' : '❌';
+    if (inp) inp.disabled = true;
+
+    // 오답 시 정답 표시 안 함 (스스로 다시 풀기)
+    listHTML += `
+      <div class="result-row">
+        <span style="font-weight:bold;">${p.number}번</span>
+        <span class="${ok ? 'tag-ok' : 'tag-ng'}">${ok ? '✅ 정답' : '❌ 오답'}</span>
+      </div>`;
+
+    resultData.push({ number: p.number, userAnswer: userAns, correct: ok });
+  });
+
+  const total = examData.problems.length;
+  const pct   = Math.round(correct / total * 100);
+  document.getElementById('rScore').textContent = correct;
+  document.getElementById('rTotal').textContent = '/ ' + total + '문제';
+  document.getElementById('rMsg').textContent   =
+    pct >= 90 ? '🎉 완벽해요!' :
+    pct >= 70 ? '👍 잘했어요!' :
+    pct >= 50 ? '💪 조금 더 노력해봐요!' : '😊 다시 도전해봐요!';
+  document.getElementById('rList').innerHTML = listHTML;
+
+  document.getElementById('main').style.display          = 'none';
+  document.getElementById('submit-bar').style.display    = 'none';
+  document.getElementById('result-screen').style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+
+  saveResult(resultData, correct, total);
+}
+
+// ── 채점 결과 GitHub 저장 ───────────────────
+async function saveResult(resultData, correct, total) {
+  const notice   = document.getElementById('save-notice');
+  const token    = examData._token;
+  const username = examData._username;
+  const repo     = examData._repo;
+
+  if (!token || !username || !repo) {
+    notice.textContent = '점수를 선생님께 알려주세요: ' + correct + '/' + total + '점 (' + Math.round(correct/total*100) + '%)';
+    return;
+  }
+
+  notice.textContent = '📤 결과 저장 중...';
+
+  const payload = {
+    examId:   examData._id,
+    title:    examData.title,
+    student:  examData.student,
+    date:     examData.date,
+    gradedAt: new Date().toLocaleString('ko-KR'),
+    score:    correct + '/' + total,
+    pct:      Math.round(correct / total * 100),
+    results:  resultData
+  };
+
+  try {
+    const filename = 'results/' + examData._id + '_result.json';
+    const content  = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
+    const res = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/${filename}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': 'token ' + token,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: '채점결과|' + examData.student + '|' + correct + '/' + total,
+        content
+      })
+    });
+
+    if (res.ok) {
+      notice.textContent = '✅ 채점 결과가 선생님께 자동 전송되었습니다! (' + correct + '/' + total + '점)';
+    } else {
+      throw new Error('저장 실패');
+    }
+  } catch(e) {
+    notice.textContent = '점수를 선생님께 알려주세요: ' + correct + '/' + total + '점';
+  }
+}
+
+// ── 다시 풀기 ────────────────────────────────
+function retryAll() {
+  if (!examData) return;
+  examData.problems.forEach(p => {
+    const inp  = document.getElementById('inp_'  + p.number);
+    const card = document.getElementById('card_' + p.number);
+    const icon = document.getElementById('icon_' + p.number);
+    const hint = card ? card.querySelector('.input-hint') : null;
+    if (inp)  { inp.value = ''; inp.disabled = false; }
+    if (card) card.className = 'card';
+    if (icon) icon.textContent = '';
+    if (hint) hint.style.display = '';
+  });
+  document.getElementById('result-screen').style.display = 'none';
+  document.getElementById('main').style.display          = 'block';
+  document.getElementById('submit-bar').style.display    = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>
