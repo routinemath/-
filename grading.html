@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>📝 자가채점</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; padding: 0; font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background: #f0f2f5; min-height: 100vh; }
+
+.header {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white; padding: 16px 16px 12px; text-align: center;
+}
+.header h1 { margin: 0 0 4px; font-size: 18px; }
+.header p  { margin: 0; font-size: 12px; opacity: .8; }
+
+.problem-wrap { padding: 12px 12px 100px; max-width: 480px; margin: 0 auto; }
+
+.card {
+  background: white; border-radius: 12px; padding: 14px;
+  margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.07);
+  border-left: 4px solid #ddd; transition: border-color .3s, background .3s;
+}
+.card.correct { border-left-color: #4CAF50; background: #f0fff4; }
+.card.wrong   { border-left-color: #f44336; background: #fff5f5; }
+.card-num { font-weight: bold; font-size: 13px; color: #555; margin-bottom: 8px; }
+
+.input-row { display: flex; gap: 8px; align-items: center; }
+.ans-input {
+  flex: 1; padding: 10px 12px; font-size: 16px;
+  border: 2px solid #ddd; border-radius: 8px; outline: none;
+  transition: border-color .2s; background: white; cursor: pointer;
+  caret-color: transparent; /* 커서 숨김 - 키패드로만 입력 */
+}
+.ans-input.active-input { border-color: #667eea; background: #f8f9ff; }
+.ans-input[disabled] { background: #fafafa; color: #333; cursor: default; }
+.result-icon { font-size: 22px; min-width: 28px; text-align: center; }
+
+/* ── 키패드 ── */
+#keypad-overlay {
+  position: fixed; bottom: 0; left: 0; width: 100%; z-index: 100;
+  background: #f0f0f0; border-top: 2px solid #ddd;
+  padding: 6px 6px 10px; display: none;
+  box-shadow: 0 -4px 12px rgba(0,0,0,.1);
+}
+#keypad-overlay.visible { display: block; }
+
+.kp-topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px; padding: 0 2px;
+}
+.keypad-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.kp-tab {
+  padding: 5px 12px; border: 1px solid #ccc; border-radius: 20px;
+  background: white; font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.kp-tab.active { background: #667eea; color: white; border-color: #667eea; }
+.kp-close {
+  padding: 5px 12px; border: 1px solid #ccc; border-radius: 6px;
+  background: white; font-size: 13px; cursor: pointer;
+}
+
+/* 분수 미리보기 */
+#frac-preview {
+  display: none; padding: 5px 10px; background: #fff8e1;
+  border-radius: 6px; font-size: 13px; text-align: center; margin-bottom: 5px;
+  border: 1px solid #ffe082;
+}
+
+.keypad-grid { display: none; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.keypad-grid.active { display: grid; }
+.keypad-grid.cols6  { grid-template-columns: repeat(6, 1fr); }
+
+.kp-btn {
+  padding: 10px 4px; background: white; border: 1px solid #ccc;
+  border-radius: 8px; font-size: 15px; cursor: pointer; text-align: center;
+  user-select: none; box-shadow: 0 2px 0 #bbb; transition: all .08s;
+  line-height: 1.2;
+}
+.kp-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #bbb; background: #e8e8e8; }
+.kp-btn.del  { background: #ffebee; color: #e53935; border-color: #ef9a9a; box-shadow: 0 2px 0 #ef9a9a; }
+.kp-btn.done { background: #667eea; color: white; border-color: #5568d5; box-shadow: 0 2px 0 #5568d5; }
+.kp-btn.sp   { background: #e0e0e0; font-size: 12px; box-shadow: 0 2px 0 #aaa; }
+.kp-btn.shift-on { background: #fff3e0; border-color: #FF9800; }
+.kp-btn.frac-confirm { background: #e8f5e9; border-color: #81c784; box-shadow: 0 2px 0 #81c784; color: #2e7d32; font-size:12px; }
+
+/* 채점 버튼 */
+#submit-bar {
+  position: fixed; bottom: 0; left: 0; width: 100%;
+  padding: 10px 16px 16px; background: white;
+  border-top: 1px solid #eee; z-index: 90;
+}
+#submit-bar button {
+  width: 100%; padding: 14px; font-size: 16px; font-weight: bold;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white; border: none; border-radius: 10px; cursor: pointer;
+}
+
+/* 결과 화면 */
+#result-screen {
+  display: none; max-width: 480px; margin: 0 auto;
+  padding: 20px 16px 40px; text-align: center;
+}
+.score-circle {
+  width: 130px; height: 130px; border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  margin: 0 auto 16px; box-shadow: 0 6px 20px rgba(102,126,234,.4);
+}
+.score-num   { font-size: 42px; font-weight: bold; color: white; line-height: 1; }
+.score-label { font-size: 13px; color: rgba(255,255,255,.8); margin-top: 3px; }
+.score-msg   { font-size: 20px; font-weight: bold; margin: 0 0 16px; }
+.result-list { text-align: left; background: white; border-radius: 12px; padding: 4px 16px; margin-bottom: 16px; }
+.result-row  { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+.result-row:last-child { border-bottom: none; }
+.tag-ok { color: #4CAF50; font-weight: bold; }
+.tag-ng { color: #f44336; font-weight: bold; }
+.btn-retry {
+  width: 100%; padding: 14px; font-size: 15px; background: #FF9800;
+  color: white; border: none; border-radius: 10px; cursor: pointer; display: block;
+}
+#save-notice { font-size: 12px; color: #888; margin-top: 12px; min-height: 18px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1 id="hTitle">📝 자가채점</h1>
+  <p  id="hSub">로딩 중...</p>
+</div>
+
+<div id="loading" style="padding:60px 20px;text-align:center;color:#888;">
+  <div style="font-size:40px;margin-bottom:12px;">⏳</div>
+  <div>문제를 불러오는 중...</div>
+</div>
+<div id="error" style="display:none;padding:60px 20px;text-align:center;color:#e53935;">
+  <div style="font-size:40px;margin-bottom:12px;">⚠️</div>
+  <div id="errorMsg">문제를 불러올 수 없습니다.</div>
+  <div style="font-size:12px;color:#aaa;margin-top:8px;">URL을 확인하거나 선생님께 문의하세요.</div>
+</div>
+
+<div id="main" style="display:none;">
+  <div class="problem-wrap" id="problemWrap"></div>
+  <div id="submit-bar"><button onclick="submitAll()">✅ 채점하기</button></div>
+</div>
+
+<div id="result-screen">
+  <div class="score-circle">
+    <div class="score-num"  id="rScore"></div>
+    <div class="score-label" id="rTotal"></div>
+  </div>
+  <div class="score-msg" id="rMsg"></div>
+  <div class="result-list" id="rList"></div>
+  <button class="btn-retry" onclick="retryAll()">🔄 다시 풀기</button>
+  <p id="save-notice"></p>
+</div>
+
+<!-- ══ 키패드 ══ -->
+<div id="keypad-overlay">
+  <div class="kp-topbar">
+    <div class="keypad-tabs">
+      <button class="kp-tab active" onclick="switchTab('num',this)">숫자</button>
+      <button class="kp-tab"       onclick="switchTab('frac',this)">분수·루트</button>
+      <button class="kp-tab"       onclick="switchTab('sym',this)">기호</button>
+      <button class="kp-tab"       onclick="switchTab('alpha',this)">영어</button>
+    </div>
+    <button class="kp-close" onclick="hideKeypad()">완료 ✓</button>
+  </div>
+
+  <div id="frac-preview"></div>
+
+  <!-- 숫자 탭 -->
+  <div class="keypad-grid active" id="tab-num">
+    <button class="kp-btn" onclick="ins('7')">7</button>
+    <button class="kp-btn" onclick="ins('8')">8</button>
+    <button class="kp-btn" onclick="ins('9')">9</button>
+    <button class="kp-btn sp" onclick="ins('+')">+</button>
+    <button class="kp-btn del" onclick="kpDel()">⌫</button>
+
+    <button class="kp-btn" onclick="ins('4')">4</button>
+    <button class="kp-btn" onclick="ins('5')">5</button>
+    <button class="kp-btn" onclick="ins('6')">6</button>
+    <button class="kp-btn sp" onclick="ins('-')">−</button>
+    <button class="kp-btn sp" onclick="ins('.')">.</button>
+
+    <button class="kp-btn" onclick="ins('1')">1</button>
+    <button class="kp-btn" onclick="ins('2')">2</button>
+    <button class="kp-btn" onclick="ins('3')">3</button>
+    <button class="kp-btn sp" onclick="ins('×')">×</button>
+    <button class="kp-btn sp" onclick="ins('÷')">÷</button>
+
+    <button class="kp-btn" onclick="ins('0')" style="grid-column:span 2">0</button>
+    <button class="kp-btn sp" onclick="ins('(')"> ( </button>
+    <button class="kp-btn sp" onclick="ins(')')"> ) </button>
+    <button class="kp-btn done" onclick="hideKeypad()">확인</button>
+  </div>
+
+  <!-- 분수·루트 탭 -->
+  <div class="keypad-grid" id="tab-frac">
+    <!-- 분자/분모 숫자 입력 -->
+    <button class="kp-btn" onclick="fracDigit('7')">7</button>
+    <button class="kp-btn" onclick="fracDigit('8')">8</button>
+    <button class="kp-btn" onclick="fracDigit('9')">9</button>
+    <button class="kp-btn sp" onclick="fracMinus()">−</button>
+    <button class="kp-btn del" onclick="fracDel()">⌫</button>
+
+    <button class="kp-btn" onclick="fracDigit('4')">4</button>
+    <button class="kp-btn" onclick="fracDigit('5')">5</button>
+    <button class="kp-btn" onclick="fracDigit('6')">6</button>
+    <!-- 분수선 버튼 -->
+    <button class="kp-btn sp" id="btnFracLine" onclick="fracLine()" style="font-size:20px; font-weight:bold; line-height:1;">—<br><span style="font-size:9px;">분수선</span></button>
+    <button class="kp-btn frac-confirm" onclick="fracConfirm()">입력<br>✓</button>
+
+    <button class="kp-btn" onclick="fracDigit('1')">1</button>
+    <button class="kp-btn" onclick="fracDigit('2')">2</button>
+    <button class="kp-btn" onclick="fracDigit('3')">3</button>
+    <button class="kp-btn" onclick="fracDigit('0')">0</button>
+    <button class="kp-btn sp" onclick="fracReset()" style="font-size:11px;">초기화</button>
+
+    <!-- 루트 / 지수 -->
+    <button class="kp-btn sp" onclick="ins('√')">√</button>
+    <button class="kp-btn sp" onclick="ins('²')">x²</button>
+    <button class="kp-btn sp" onclick="ins('³')">x³</button>
+    <button class="kp-btn sp" onclick="ins('π')">π</button>
+    <button class="kp-btn done" onclick="hideKeypad()">확인</button>
+  </div>
+
+  <!-- 기호 탭 -->
+  <div class="keypad-grid" id="tab-sym">
+    <button class="kp-btn" onclick="ins('①')">①</button>
+    <button class="kp-btn" onclick="ins('②')">②</button>
+    <button class="kp-btn" onclick="ins('③')">③</button>
+    <button class="kp-btn" onclick="ins('④')">④</button>
+    <button class="kp-btn" onclick="ins('⑤')">⑤</button>
+
+    <button class="kp-btn sp" onclick="ins('x')">x</button>
+    <button class="kp-btn sp" onclick="ins('y')">y</button>
+    <button class="kp-btn sp" onclick="ins('n')">n</button>
+    <button class="kp-btn sp" onclick="ins('k')">k</button>
+    <button class="kp-btn del" onclick="kpDel()">⌫</button>
+
+    <button class="kp-btn sp" onclick="ins('≤')">≤</button>
+    <button class="kp-btn sp" onclick="ins('≥')">≥</button>
+    <button class="kp-btn sp" onclick="ins('≠')">≠</button>
+    <button class="kp-btn sp" onclick="ins('∈')">∈</button>
+    <button class="kp-btn sp" onclick="ins('∞')">∞</button>
+
+    <button class="kp-btn sp" onclick="ins('{')">｛</button>
+    <button class="kp-btn sp" onclick="ins('}')">｝</button>
+    <button class="kp-btn sp" onclick="ins(',')">，</button>
+    <button class="kp-btn sp" onclick="ins('|')">｜</button>
+    <button class="kp-btn done" onclick="hideKeypad()">확인</button>
+  </div>
+
+  <!-- 영어 탭 (6열) -->
+  <div class="keypad-grid cols6" id="tab-alpha">
+    <button class="kp-btn" id="ab_q" onclick="insA('q')">q</button>
+    <button class="kp-btn" id="ab_w" onclick="insA('w')">w</button>
+    <button class="kp-btn" id="ab_e" onclick="insA('e')">e</button>
+    <button class="kp-btn" id="ab_r" onclick="insA('r')">r</button>
+    <button class="kp-btn" id="ab_t" onclick="insA('t')">t</button>
+    <button class="kp-btn" id="ab_y" onclick="insA('y')">y</button>
+
+    <button class="kp-btn" id="ab_u" onclick="insA('u')">u</button>
+    <button class="kp-btn" id="ab_i" onclick="insA('i')">i</button>
+    <button class="kp-btn" id="ab_o" onclick="insA('o')">o</button>
+    <button class="kp-btn" id="ab_p" onclick="insA('p')">p</button>
+    <button class="kp-btn" id="ab_a" onclick="insA('a')">a</button>
+    <button class="kp-btn" id="ab_s" onclick="insA('s')">s</button>
+
+    <button class="kp-btn" id="ab_d" onclick="insA('d')">d</button>
+    <button class="kp-btn" id="ab_f" onclick="insA('f')">f</button>
+    <button class="kp-btn" id="ab_g" onclick="insA('g')">g</button>
+    <button class="kp-btn" id="ab_h" onclick="insA('h')">h</button>
+    <button class="kp-btn" id="ab_j" onclick="insA('j')">j</button>
+    <button class="kp-btn" id="ab_k" onclick="insA('k')">k</button>
+
+    <button class="kp-btn" id="ab_l" onclick="insA('l')">l</button>
+    <button class="kp-btn" id="ab_z" onclick="insA('z')">z</button>
+    <button class="kp-btn" id="ab_x" onclick="insA('x')">x</button>
+    <button class="kp-btn" id="ab_c" onclick="insA('c')">c</button>
+    <button class="kp-btn" id="ab_v" onclick="insA('v')">v</button>
+    <button class="kp-btn" id="ab_b" onclick="insA('b')">b</button>
+
+    <button class="kp-btn" id="ab_n" onclick="insA('n')">n</button>
+    <button class="kp-btn" id="ab_m" onclick="insA('m')">m</button>
+    <button class="kp-btn sp shift-btn" id="shiftBtn" onclick="toggleShift()">⇧</button>
+    <button class="kp-btn del" onclick="kpDel()">⌫</button>
+    <button class="kp-btn done" onclick="hideKeypad()" style="grid-column:span 2">확인</button>
+  </div>
+</div>
+
+<script>
+// ── 상태 변수 ──────────────────────────────
+let examData    = null;
+let activeInput = null;
+let isShift     = false;
+
+// 분수 입력 상태
+let fNumer = '';   // 분자
+let fDenom = '';   // 분모
+let fStage = 'N';  // 'N'=분자 입력 중, 'D'=분모 입력 중
+
+// ── 초기화 ─────────────────────────────────
+(async function init() {
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { showError('QR 코드에 문제 ID가 없습니다.'); return; }
+
+  const base = location.href.replace(/\/grading\.html.*$/, '');
+  try {
+    const res = await fetch(base + '/answers/' + id + '.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    examData = await res.json();
+    examData._id = id;
+    examData._base = base;
+    renderProblems();
+  } catch(e) {
+    showError('문제 파일을 불러올 수 없습니다.<br><small>' + e.message + '</small>');
+  }
+})();
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('error').style.display = 'block';
+  document.getElementById('errorMsg').innerHTML = msg;
+}
+
+// ── 문제 렌더링 ─────────────────────────────
+function renderProblems() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('hTitle').textContent = '📝 ' + examData.title;
+  document.getElementById('hSub').textContent   = examData.student + ' | ' + (examData.date || '');
+
+  const wrap = document.getElementById('problemWrap');
+  wrap.innerHTML = '';
+  examData.problems.forEach(p => {
+    const d = document.createElement('div');
+    d.className = 'card'; d.id = 'card_' + p.number;
+    d.innerHTML = `<div class="card-num">문제 ${p.number}번</div>
+      <div class="input-row">
+        <input class="ans-input" id="inp_${p.number}" readonly placeholder="탭하여 답 입력" autocomplete="off">
+        <span class="result-icon" id="icon_${p.number}"></span>
+      </div>`;
+    d.querySelector('.ans-input').addEventListener('click', function(){ openKeypad(this); });
+    wrap.appendChild(d);
+  });
+  document.getElementById('main').style.display = 'block';
+}
+
+// ── 키패드 열기/닫기 ────────────────────────
+function openKeypad(el) {
+  activeInput = el;
+  document.querySelectorAll('.ans-input').forEach(i => i.classList.remove('active-input'));
+  el.classList.add('active-input');
+  document.getElementById('keypad-overlay').classList.add('visible');
+  document.getElementById('submit-bar').style.display = 'none';
+  fracReset();
+  setTimeout(() => el.closest('.card').scrollIntoView({behavior:'smooth', block:'center'}), 150);
+}
+function hideKeypad() {
+  document.getElementById('keypad-overlay').classList.remove('visible');
+  document.getElementById('submit-bar').style.display = 'block';
+  if (activeInput) activeInput.classList.remove('active-input');
+  activeInput = null;
+  fracReset();
+}
+
+// 탭 전환
+function switchTab(tab, btn) {
+  document.querySelectorAll('.keypad-grid').forEach(g => g.classList.remove('active'));
+  document.querySelectorAll('.kp-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active');
+  const fp = document.getElementById('frac-preview');
+  if (tab === 'frac') { fp.style.display = 'block'; updateFracPreview(); }
+  else { fp.style.display = 'none'; fracReset(); }
+}
+
+// ── 일반 문자 삽입 / 삭제 ───────────────────
+function ins(ch) {
+  if (!activeInput) return;
+  const p = activeInput.selectionStart ?? activeInput.value.length;
+  const v = activeInput.value;
+  activeInput.value = v.slice(0,p) + ch + v.slice(p);
+  activeInput.setSelectionRange(p+ch.length, p+ch.length);
+}
+function kpDel() {
+  if (!activeInput) return;
+  const p = activeInput.selectionStart ?? activeInput.value.length;
+  if (p===0) return;
+  const v = activeInput.value;
+  activeInput.value = v.slice(0,p-1) + v.slice(p);
+  activeInput.setSelectionRange(p-1, p-1);
+}
+
+// ── 영어 탭 ─────────────────────────────────
+function insA(ch) { ins(isShift ? ch.toUpperCase() : ch); }
+function toggleShift() {
+  isShift = !isShift;
+  const btn = document.getElementById('shiftBtn');
+  btn.classList.toggle('shift-on', isShift);
+  btn.textContent = isShift ? '⇧↑' : '⇧';
+  'qwertyuiopasdfghjklzxcvbnm'.split('').forEach(c => {
+    const el = document.getElementById('ab_' + c);
+    if (el) el.textContent = isShift ? c.toUpperCase() : c;
+  });
+}
+
+// ── 분수 입력 ────────────────────────────────
+// 흐름: 분자 숫자 입력 → [분수선] → 분모 숫자 입력 → [입력✓]
+function fracDigit(d) {
+  if (fStage === 'N') fNumer += d;
+  else                fDenom += d;
+  updateFracPreview();
+}
+function fracMinus() {
+  // 분자가 비어있을 때만 음수 부호
+  if (fStage === 'N' && fNumer === '') fNumer = '-';
+  updateFracPreview();
+}
+function fracLine() {
+  if (!fNumer) return;  // 분자 없으면 무시
+  fStage = 'D'; fDenom = '';
+  updateFracPreview();
+}
+function fracConfirm() {
+  if (!fNumer) return;
+  ins(fDenom ? fNumer + '/' + fDenom : fNumer);
+  fracReset();
+}
+function fracDel() {
+  if (fStage === 'D') {
+    if (fDenom.length > 0) fDenom = fDenom.slice(0,-1);
+    else { fStage = 'N'; }   // 분모 다 지우면 분자로 돌아옴
+  } else {
+    fNumer = fNumer.slice(0,-1);
+  }
+  updateFracPreview();
+}
+function fracReset() {
+  fNumer = ''; fDenom = ''; fStage = 'N';
+  updateFracPreview();
+}
+function updateFracPreview() {
+  const fp = document.getElementById('frac-preview');
+  if (!document.getElementById('tab-frac').classList.contains('active')) return;
+  if (!fNumer && !fDenom) {
+    fp.innerHTML = '<span style="color:#aaa;">숫자 입력 후 분수선(—) 버튼을 누르세요</span>';
+  } else if (fStage === 'N') {
+    fp.innerHTML = '분자: <strong>' + (fNumer||'?') + '</strong> / ?  &nbsp;→ 분수선 버튼 누르세요';
+  } else {
+    fp.innerHTML = '<strong style="font-size:15px;">' + fNumer + ' / ' + (fDenom||'?') + '</strong>'
+      + ' &nbsp;<span style="color:#888;font-size:11px;">← 입력✓ 버튼으로 확정</span>';
+  }
+}
+
+// 키패드 외부 탭 시 닫기
+document.addEventListener('click', function(e) {
+  const kp = document.getElementById('keypad-overlay');
+  if (!kp.classList.contains('visible')) return;
+  if (kp.contains(e.target) || e.target.classList.contains('ans-input')) return;
+  hideKeypad();
+});
+
+// ── 정규화 ──────────────────────────────────
+function norm(s) {
+  if (!s && s !== 0) return '';
+  return s.toString().trim().toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/×/g,'*').replace(/÷/g,'/')
+    .replace(/[（(]/g,'(').replace(/[）)]/g,')')
+    .replace(/[，,]/g,',').replace(/－/g,'-').replace(/＋/g,'+')
+    .replace(/①/g,'1').replace(/②/g,'2').replace(/③/g,'3')
+    .replace(/④/g,'4').replace(/⑤/g,'5');
+}
+
+// ── 채점 ────────────────────────────────────
+function submitAll() {
+  if (!examData) return;
+  hideKeypad();
+
+  let correct = 0;
+  let listHTML = '';
+  const resultData = [];
+
+  examData.problems.forEach(p => {
+    const inp  = document.getElementById('inp_'  + p.number);
+    const card = document.getElementById('card_' + p.number);
+    const icon = document.getElementById('icon_' + p.number);
+
+    const userAns = inp ? inp.value.trim() : '';
+    const corrAns = p.answer || '';
+    const ok = corrAns && norm(userAns) === norm(corrAns);
+
+    if (ok) correct++;
+    card.className   = 'card ' + (ok ? 'correct' : 'wrong');
+    icon.textContent = ok ? '✅' : '❌';
+    if (inp) inp.disabled = true;
+
+    // 오답 시 정답 표시 안 함 (스스로 다시 풀기)
+    listHTML += `
+      <div class="result-row">
+        <span style="font-weight:bold;">${p.number}번</span>
+        <span class="${ok ? 'tag-ok' : 'tag-ng'}">${ok ? '✅ 정답' : '❌ 오답'}</span>
+      </div>`;
+
+    resultData.push({ number: p.number, userAnswer: userAns, correct: ok });
+  });
+
+  const total = examData.problems.length;
+  const pct   = Math.round(correct / total * 100);
+  document.getElementById('rScore').textContent = correct;
+  document.getElementById('rTotal').textContent = '/ ' + total + '문제';
+  document.getElementById('rMsg').textContent   =
+    pct >= 90 ? '🎉 완벽해요!' :
+    pct >= 70 ? '👍 잘했어요!' :
+    pct >= 50 ? '💪 조금 더 노력해봐요!' : '😊 다시 도전해봐요!';
+  document.getElementById('rList').innerHTML = listHTML;
+
+  document.getElementById('main').style.display          = 'none';
+  document.getElementById('submit-bar').style.display    = 'none';
+  document.getElementById('result-screen').style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+
+  // 채점 결과 GitHub 저장
+  saveResult(resultData, correct, total);
+}
+
+// ── 채점 결과 GitHub 저장 ───────────────────
+async function saveResult(resultData, correct, total) {
+  const notice = document.getElementById('save-notice');
+  const token    = examData._token;
+  const username = examData._username;
+  const repo     = examData._repo;
+
+  if (!token || !username || !repo) {
+    notice.textContent = '점수를 선생님께 알려주세요: ' + correct + '/' + total + '점 (' + Math.round(correct/total*100) + '%)';
+    return;
+  }
+
+  notice.textContent = '📤 결과 저장 중...';
+
+  const payload = {
+    examId:   examData._id,
+    title:    examData.title,
+    student:  examData.student,
+    date:     examData.date,
+    gradedAt: new Date().toLocaleString('ko-KR'),
+    score:    correct + '/' + total,
+    pct:      Math.round(correct / total * 100),
+    results:  resultData
+  };
+
+  try {
+    const filename = 'results/' + examData._id + '_result.json';
+    const content  = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
+
+    const res = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/${filename}`, {
+      method:  'PUT',
+      headers: {
+        'Authorization': 'token ' + token,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type':  'application/json'
+      },
+      body: JSON.stringify({ message: '채점결과|' + examData.student + '|' + correct + '/' + total, content })
+    });
+
+    if (res.ok) {
+      notice.textContent = '✅ 채점 결과가 선생님께 자동 전송되었습니다! (' + correct + '/' + total + '점)';
+    } else {
+      const err = await res.json();
+      throw new Error(err.message || '저장 실패');
+    }
+  } catch(e) {
+    notice.textContent = '⚠️ 자동 전송 실패. 점수를 선생님께 직접 알려주세요: ' + correct + '/' + total + '점';
+  }
+}
+
+// ── 다시 풀기 ────────────────────────────────
+function retryAll() {
+  if (!examData) return;
+  examData.problems.forEach(p => {
+    const inp  = document.getElementById('inp_'  + p.number);
+    const card = document.getElementById('card_' + p.number);
+    const icon = document.getElementById('icon_' + p.number);
+    if (inp)  { inp.value = ''; inp.disabled = false; }
+    if (card) card.className = 'card';
+    if (icon) icon.textContent = '';
+  });
+  document.getElementById('result-screen').style.display = 'none';
+  document.getElementById('main').style.display          = 'block';
+  document.getElementById('submit-bar').style.display    = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>
