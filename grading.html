@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>📝 스마트 자가채점</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  margin: 0; padding: 0;
+  font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  background: #f4f6f9; min-height: 100vh;
+}
+
+/* ── 헤더 ── */
+.header {
+  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  color: white; padding: 20px 16px 16px; text-align: center;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.header h1 { margin: 0 0 6px; font-size: 19px; font-weight: 700; }
+.header p  { margin: 0; font-size: 13px; opacity: 0.9; }
+
+/* ── 문제 카드 ── */
+.problem-wrap { padding: 16px 16px 100px; max-width: 500px; margin: 0 auto; }
+.card {
+  background: white; border-radius: 16px; padding: 20px;
+  margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+  border: 1px solid #edf2f7; transition: all 0.3s ease;
+}
+.card.correct { border: 2px solid #10B981; background: #F0FDF4; }
+.card.wrong   { border: 2px solid #EF4444; background: #FEF2F2; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.card-num { font-weight: 700; font-size: 15px; color: #374151; background: #F3F4F6; padding: 4px 10px; border-radius: 8px; }
+.result-icon { font-size: 20px; font-weight: bold; }
+
+/* ── 메타인지 뱃지 ── */
+.meta-badge {
+  display: inline-block; padding: 6px 10px; font-size: 13px; font-weight: bold;
+  background: #FEE2E2; color: #EF4444; border-radius: 8px; margin-top: 10px;
+}
+
+/* ── 답 입력창 ── */
+.ans-input {
+  width: 100%; padding: 14px 16px; font-size: 18px; font-weight: bold;
+  border: 2px solid #E5E7EB; border-radius: 12px; outline: none;
+  transition: all 0.2s; background: #F9FAFB; text-align: center;
+}
+.ans-input:focus { border-color: #4F46E5; background: white; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+.ans-input[disabled] { background: transparent; color: #111827; border-color: transparent; padding: 0; font-size: 24px; }
+
+/* ── 수식 퀵버튼 바 (2단 고정) ── */
+.quick-rows { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.quick-row { display: flex; gap: 8px; }
+.qb {
+  flex: 1; padding: 12px 0; text-align: center;
+  background: #EEF2FF; border: 1px solid #C7D2FE;
+  border-radius: 8px; font-size: 16px; cursor: pointer;
+  color: #4F46E5; font-weight: 600; touch-action: manipulation;
+}
+.qb:active { background: #C7D2FE; }
+
+/* ── 하단 고정 버튼 ── */
+#submit-bar {
+  position: fixed; bottom: 0; left: 0; width: 100%;
+  padding: 12px 16px 24px; background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(10px); border-top: 1px solid #E5E7EB; z-index: 90;
+}
+.btn-primary {
+  width: 100%; max-width: 500px; margin: 0 auto; display: block;
+  padding: 16px; font-size: 17px; font-weight: bold;
+  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  color: white; border: none; border-radius: 14px; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(79,70,229,0.3);
+}
+
+/* ── 결과 화면 ── */
+#result-screen { display: none; max-width: 500px; margin: 0 auto; padding: 40px 20px 80px; text-align: center; }
+.score-circle {
+  width: 140px; height: 140px; border-radius: 50%;
+  background: linear-gradient(135deg, #10B981, #059669);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  margin: 0 auto 24px; box-shadow: 0 8px 24px rgba(16,185,129,0.3); color: white;
+}
+.score-num { font-size: 48px; font-weight: 800; line-height: 1; }
+.score-label { font-size: 14px; opacity: 0.9; margin-top: 4px; }
+.score-msg { font-size: 24px; font-weight: 800; margin-bottom: 30px; color: #111827; }
+.btn-retry {
+  width: 100%; padding: 18px; font-size: 17px; font-weight: bold;
+  background: #F59E0B; color: white; border: none; border-radius: 14px; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(245,158,11,0.3);
+}
+
+/* ── 메타인지 팝업 ── */
+#metaOverlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; padding: 20px;
+}
+.meta-box { background: white; border-radius: 16px; padding: 24px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+.meta-btn {
+  width: 100%; padding: 16px; font-size: 15px; font-weight: bold; color: #374151;
+  background: #F3F4F6; border: 2px solid #E5E7EB; border-radius: 12px; cursor: pointer;
+  margin-bottom: 10px; text-align: left; transition: all 0.2s;
+}
+.meta-btn:active { background: #E5E7EB; border-color: #D1D5DB; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1 id="hTitle">📝 불러오는 중...</h1>
+  <p id="hSub">QR 코드를 확인하고 있습니다</p>
+</div>
+
+<div id="loading" style="padding:80px 20px;text-align:center;color:#6B7280;">
+  <div style="font-size:48px;margin-bottom:16px;">⏳</div>
+  <div style="font-size: 16px; font-weight: bold;">문제를 불러오는 중...</div>
+</div>
+
+<div id="main" style="display:none;">
+  <div class="problem-wrap" id="problemWrap"></div>
+  <div id="submit-bar"><button class="btn-primary" onclick="submitAll()">✅ 채점 완료하기</button></div>
+</div>
+
+<div id="result-screen">
+  <div class="score-circle">
+    <div class="score-num" id="rScore"></div>
+    <div class="score-label" id="rTotal"></div>
+  </div>
+  <div class="score-msg" id="rMsg"></div>
+  <p style="color: #6B7280; margin-bottom: 20px; line-height: 1.6;">틀린 문제는 다시 풀어볼 수 있습니다!</p>
+  <button class="btn-retry" onclick="retryAll()">🔄 틀린 문제 다시 풀기</button>
+</div>
+
+<div id="metaOverlay">
+  <div class="meta-box">
+    <h2 style="margin:0 0 10px; color:#374151; font-size: 20px;">잠깐! 오답 원인 분석 🧐</h2>
+    <p style="margin:0 0 20px; color:#6B7280; font-size:15px; line-height: 1.5;">
+      앗, <strong id="metaProbNum" style="color:#EF4444; font-size:20px;"></strong>번 문제를 틀렸네요.<br>스스로 생각하기에 왜 틀린 것 같나요?
+    </p>
+    <div style="display:flex; flex-direction:column;">
+      <button class="meta-btn" onclick="selectMetaReason('계산실수')">🧮 아차! 단순 계산 실수</button>
+      <button class="meta-btn" onclick="selectMetaReason('집중력부족')">😵 아뿔싸! 문제를 잘못 읽음</button>
+      <button class="meta-btn" onclick="selectMetaReason('조건활용못함')">⚙️ 주어진 조건(힌트)을 못 씀</button>
+      <button class="meta-btn" onclick="selectMetaReason('식세우기어려움')">🧩 식 세우기가 어려움</button>
+      <button class="meta-btn" onclick="selectMetaReason('개념연결못함')">📖 어떻게 푸는지 아예 모르겠음</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let examData = null;
+const ROW1 = [['①','①'], ['②','②'], ['③','③'], ['④','④'], ['⑤','⑤']];
+const ROW2 = [['√','√'], ['²','²'], ['³','³'], ['분수(/)','/'], ['π','π']];
+
+// 메타인지 팝업용 큐
+let wrongQueue = [];
+let currentMetaIndex = 0;
+
+(async function init() {
+  const id = new URLSearchParams(location.search).get('id');
+  const base = location.href.replace(/\/grading\.html.*$/, '');
+  try {
+    const res = await fetch(base + '/answers/' + id + '.json');
+    examData = await res.json();
+    renderProblems();
+  } catch(e) {
+    document.getElementById('loading').innerHTML = '⚠️ 문제를 불러올 수 없습니다.';
+  }
+})();
+
+function renderProblems() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('hTitle').textContent = examData.title;
+  document.getElementById('hSub').textContent = '👤 ' + examData.student;
+
+  const wrap = document.getElementById('problemWrap');
+  let html = '';
+
+  const genRow = (arr, pNum) => arr.map(([label, val]) =>
+    `<button type="button" class="qb" onmousedown="event.preventDefault();" onclick="insertQuick('inp_${pNum}','${val}')">${label}</button>`
+  ).join('');
+
+  examData.problems.forEach(p => {
+    html += `
+      <div class="card" id="card_${p.number}">
+        <div class="card-header">
+          <div class="card-num">${p.number}번</div>
+          <div class="result-icon" id="icon_${p.number}"></div>
+        </div>
+        <input class="ans-input" id="inp_${p.number}" type="text" placeholder="정답 입력" autocomplete="off" spellcheck="false">
+        <div class="quick-rows" id="qb_${p.number}">
+          <div class="quick-row">${genRow(ROW1, p.number)}</div>
+          <div class="quick-row">${genRow(ROW2, p.number)}</div>
+        </div>
+        <div id="meta_badge_${p.number}" style="display:none;"></div>
+      </div>`;
+  });
+
+  wrap.innerHTML = html;
+  document.getElementById('main').style.display = 'block';
+}
+
+function insertQuick(inputId, val) {
+  const el = document.getElementById(inputId);
+  if (!el || el.disabled) return;
+  const start = el.selectionStart || el.value.length;
+  const end = el.selectionEnd || el.value.length;
+  const v = el.value;
+  el.value = v.slice(0, start) + val + v.slice(end);
+  el.setSelectionRange(start + val.length, start + val.length);
+  el.focus();
+}
+
+function norm(s) {
+  if (!s && s !== 0) return '';
+  return s.toString().trim().toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/\^2/g, '²').replace(/\^3/g, '³')
+    .replace(/×/g,'*').replace(/÷/g,'/')
+    .replace(/[（(]/g,'(').replace(/[）)]/g,')')
+    .replace(/[①]/g,'1').replace(/[②]/g,'2').replace(/[③]/g,'3').replace(/[④]/g,'4').replace(/[⑤]/g,'5');
+}
+
+// 💡 1단계: 채점 후 오답 필터링
+function submitAll() {
+  if (!examData) return;
+  wrongQueue = [];
+  
+  examData.problems.forEach(p => {
+    const inp = document.getElementById('inp_' + p.number);
+    const userAns = inp ? inp.value.trim() : '';
+    const corrAns = p.answer || '';
+    const ok = corrAns && norm(userAns) === norm(corrAns);
+    
+    p.userAns = userAns;
+    p.ok = ok;
+    
+    if (!ok) {
+      wrongQueue.push(p);
+    }
+  });
+
+  if (wrongQueue.length > 0) {
+    currentMetaIndex = 0;
+    showMetaPopup(); // 오답이 있으면 팝업 먼저 띄움
+  } else {
+    finalizeSubmit(); // 다 맞췄으면 바로 결과 화면
+  }
+}
+
+// 💡 2단계: 메타인지 팝업 표시
+function showMetaPopup() {
+  const currentProblem = wrongQueue[currentMetaIndex];
+  document.getElementById('metaProbNum').textContent = currentProblem.number;
+  document.getElementById('metaOverlay').style.display = 'flex';
+}
+
+// 💡 3단계: 원인 선택 시 큐 진행
+function selectMetaReason(reason) {
+  const currentProblem = wrongQueue[currentMetaIndex];
+  
+  // 텍스트 변환 (화면 표시용)
+  const reasonTextMap = {
+    '계산실수': '🧮 아차! 단순 계산 실수',
+    '집중력부족': '😵 아뿔싸! 문제를 잘못 읽음',
+    '조건활용못함': '⚙️ 주어진 조건(힌트)을 못 씀',
+    '식세우기어려움': '🧩 식 세우기가 어려움',
+    '개념연결못함': '📖 어떻게 푸는지 아예 모르겠음'
+  };
+  
+  currentProblem.metaReasonText = reasonTextMap[reason];
+
+  currentMetaIndex++;
+  if (currentMetaIndex < wrongQueue.length) {
+    showMetaPopup(); // 다음 오답 문제로
+  } else {
+    document.getElementById('metaOverlay').style.display = 'none';
+    finalizeSubmit(); // 모두 끝났으면 최종 결과 표시
+  }
+}
+
+// 💡 4단계: 최종 UI 업데이트
+function finalizeSubmit() {
+  let correct = 0;
+
+  examData.problems.forEach(p => {
+    const card = document.getElementById('card_' + p.number);
+    const icon = document.getElementById('icon_' + p.number);
+    const qb = document.getElementById('qb_' + p.number);
+    const inp = document.getElementById('inp_' + p.number);
+    const badge = document.getElementById('meta_badge_' + p.number);
+
+    if (p.ok) correct++;
+
+    card.className = 'card ' + (p.ok ? 'correct' : 'wrong');
+    icon.textContent = p.ok ? '✅' : '❌';
+    icon.style.color = p.ok ? '#10B981' : '#EF4444';
+    
+    if (inp) inp.disabled = true;
+    if (qb) qb.style.display = 'none';
+
+    // 학생이 선택한 오답 원인을 카드에 뱃지로 표시
+    if (!p.ok && p.metaReasonText) {
+      badge.innerHTML = `<div class="meta-badge">나의 진단: ${p.metaReasonText}</div>`;
+      badge.style.display = 'block';
+    }
+  });
+
+  const total = examData.problems.length;
+  const pct = Math.round(correct / total * 100);
+  
+  document.getElementById('rScore').textContent = correct;
+  document.getElementById('rTotal').textContent = '/ ' + total + '문제 정답';
+  document.getElementById('rMsg').textContent =
+    pct >= 90 ? '🎉 완벽해요!' : pct >= 70 ? '👍 잘했어요!' : '💪 조금 더 노력해봐요!';
+
+  document.getElementById('main').style.display = 'none';
+  document.getElementById('result-screen').style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// 다시 풀기
+function retryAll() {
+  examData.problems.forEach(p => {
+    const card = document.getElementById('card_' + p.number);
+    const inp = document.getElementById('inp_' + p.number);
+    const icon = document.getElementById('icon_' + p.number);
+    const qb = document.getElementById('qb_' + p.number);
+    const badge = document.getElementById('meta_badge_' + p.number);
+    
+    if (card && card.classList.contains('wrong')) {
+      if (inp) { inp.value = ''; inp.disabled = false; }
+      card.className = 'card';
+      if (icon) icon.textContent = '';
+      if (qb) qb.style.display = 'flex';
+      if (badge) badge.style.display = 'none'; // 다시 풀때는 뱃지 숨김
+    }
+  });
+  
+  document.getElementById('result-screen').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>
