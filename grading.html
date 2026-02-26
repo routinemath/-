@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>📝 스마트 자가채점</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  margin: 0; padding: 0;
+  font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  background: #f4f6f9; min-height: 100vh;
+}
+
+/* ── 헤더 & 진행률 ── */
+.header {
+  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  color: white; padding: 20px 16px 16px; text-align: center;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.header h1 { margin: 0 0 6px; font-size: 19px; font-weight: 700; }
+.header p  { margin: 0; font-size: 13px; opacity: 0.9; }
+
+/* ── 문제 카드 ── */
+.problem-wrap { padding: 16px 16px 100px; max-width: 500px; margin: 0 auto; }
+.card {
+  background: white; border-radius: 16px; padding: 20px;
+  margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+  border: 1px solid #edf2f7; transition: all 0.3s ease;
+}
+.card.correct { border: 2px solid #10B981; background: #F0FDF4; }
+.card.wrong   { border: 2px solid #EF4444; background: #FEF2F2; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.card-num { font-weight: 700; font-size: 15px; color: #374151; background: #F3F4F6; padding: 4px 10px; border-radius: 8px; }
+.result-icon { font-size: 20px; font-weight: bold; }
+
+/* ── 답 입력창 ── */
+.ans-input {
+  width: 100%; padding: 14px 16px; font-size: 18px; font-weight: bold;
+  border: 2px solid #E5E7EB; border-radius: 12px; outline: none;
+  transition: all 0.2s; background: #F9FAFB; text-align: center;
+}
+.ans-input:focus { border-color: #4F46E5; background: white; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+.ans-input[disabled] { background: transparent; color: #111827; border-color: transparent; padding: 0; font-size: 24px; }
+
+/* ── 수식 퀵버튼 바 (입력할 때만 보이게 깔끔하게) ── */
+.quick-bar {
+  display: flex; gap: 6px; overflow-x: auto; padding: 12px 0 4px;
+  scrollbar-width: none;
+}
+.quick-bar::-webkit-scrollbar { display: none; }
+.qb {
+  flex-shrink: 0; padding: 8px 14px;
+  background: #EEF2FF; border: 1px solid #C7D2FE;
+  border-radius: 10px; font-size: 15px; cursor: pointer;
+  color: #4F46E5; font-weight: 600; white-space: nowrap;
+  transition: background 0.1s;
+}
+.qb:active { background: #C7D2FE; }
+
+/* ── 하단 고정 버튼 ── */
+#submit-bar {
+  position: fixed; bottom: 0; left: 0; width: 100%;
+  padding: 12px 16px 24px; background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(10px); border-top: 1px solid #E5E7EB; z-index: 90;
+}
+.btn-primary {
+  width: 100%; max-width: 500px; margin: 0 auto; display: block;
+  padding: 16px; font-size: 17px; font-weight: bold;
+  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  color: white; border: none; border-radius: 14px; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(79,70,229,0.3); transition: transform 0.1s;
+}
+.btn-primary:active { transform: scale(0.98); }
+
+/* ── 결과 화면 ── */
+#result-screen { display: none; max-width: 500px; margin: 0 auto; padding: 30px 20px 60px; text-align: center; }
+.score-circle {
+  width: 140px; height: 140px; border-radius: 50%;
+  background: linear-gradient(135deg, #10B981, #059669);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  margin: 0 auto 20px; box-shadow: 0 8px 24px rgba(16,185,129,0.3); color: white;
+}
+.score-num { font-size: 48px; font-weight: 800; line-height: 1; }
+.score-label { font-size: 14px; opacity: 0.9; margin-top: 4px; }
+.score-msg { font-size: 22px; font-weight: 800; margin-bottom: 24px; color: #111827; }
+
+/* ── 결과 복사 카드 ── */
+.copy-card {
+  background: white; border-radius: 16px; padding: 24px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06); margin-bottom: 24px; border: 1px solid #E5E7EB;
+}
+.btn-copy {
+  width: 100%; padding: 16px; font-size: 16px; font-weight: bold;
+  background: #F59E0B; color: white; border: none; border-radius: 12px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 4px 12px rgba(245,158,11,0.3);
+}
+.btn-retry {
+  width: 100%; padding: 16px; font-size: 16px; font-weight: bold;
+  background: #F3F4F6; color: #4B5563; border: none; border-radius: 12px; cursor: pointer; margin-top: 12px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1 id="hTitle">📝 불러오는 중...</h1>
+  <p id="hSub">QR 코드를 확인하고 있습니다</p>
+</div>
+
+<div id="loading" style="padding:80px 20px;text-align:center;color:#6B7280;">
+  <div style="font-size:48px;margin-bottom:16px; animation: spin 2s linear infinite;">⏳</div>
+  <div style="font-size: 16px; font-weight: bold;">문제를 불러오는 중...</div>
+</div>
+
+<div id="error" style="display:none;padding:80px 20px;text-align:center;color:#EF4444;">
+  <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+  <div id="errorMsg" style="font-size: 16px; font-weight: bold;">문제를 불러올 수 없습니다.</div>
+</div>
+
+<div id="main" style="display:none;">
+  <div class="problem-wrap" id="problemWrap"></div>
+  <div id="submit-bar"><button class="btn-primary" onclick="submitAll()">✅ 채점 완료하기</button></div>
+</div>
+
+<div id="result-screen">
+  <div class="score-circle">
+    <div class="score-num" id="rScore"></div>
+    <div class="score-label" id="rTotal"></div>
+  </div>
+  <div class="score-msg" id="rMsg"></div>
+  
+  <div class="copy-card">
+    <p style="margin: 0 0 16px; color: #4B5563; font-size: 14px; line-height: 1.5;">
+      채점이 완료되었습니다!<br>아래 버튼을 눌러 <strong>결과를 선생님께 카톡으로</strong> 보내주세요.
+    </p>
+    <button class="btn-copy" onclick="copyResultCode()">
+      <span>📋</span> 결과를 복사해서 카톡 보내기
+    </button>
+  </div>
+  
+  <button class="btn-retry" onclick="retryAll()">🔄 틀린 문제 다시 풀기</button>
+</div>
+
+<script>
+let examData = null;
+
+// ── 퀵버튼 정의 ──
+const QUICK_BTNS = [
+  ['①','①'], ['②','②'], ['③','③'], ['④','④'], ['⑤','⑤'],
+  ['√','√'], ['^2','²'], ['^3','³'], ['분수(/)','/'], 
+  ['x','x'], ['y','y'], ['a','a'], ['π','π'],
+  ['(','('], [')',')'], ['+','+'], ['-','-'], ['×','×']
+];
+
+// ── 초기화 ──
+(async function init() {
+  const id = new URLSearchParams(location.search).get('id');
+  if (!id) { showError('QR 코드 정보가 잘못되었습니다.'); return; }
+  const base = location.href.replace(/\/grading\.html.*$/, '');
+  
+  try {
+    const res = await fetch(base + '/answers/' + id + '.json');
+    if (!res.ok) throw new Error('파일을 찾을 수 없습니다.');
+    examData = await res.json();
+    renderProblems();
+  } catch(e) {
+    showError('네트워크 오류가 발생했습니다.<br>인터넷 연결을 확인해주세요.');
+  }
+})();
+
+function showError(msg) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('error').style.display = 'block';
+  document.getElementById('errorMsg').innerHTML = msg;
+}
+
+// ── 문제 렌더링 ──
+function renderProblems() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('hTitle').textContent = examData.title;
+  document.getElementById('hSub').textContent = '👤 ' + examData.student + ' | 📅 ' + (examData.date || '');
+
+  const wrap = document.getElementById('problemWrap');
+  let html = '';
+
+  const qbHTML = QUICK_BTNS.map(([label, val]) =>
+    `<button class="qb" onclick="insertQuick('inp_#NUM#','${val}')">${label}</button>`
+  ).join('');
+
+  examData.problems.forEach(p => {
+    html += `
+      <div class="card" id="card_${p.number}">
+        <div class="card-header">
+          <div class="card-num">${p.number}번</div>
+          <div class="result-icon" id="icon_${p.number}"></div>
+        </div>
+        <input class="ans-input" id="inp_${p.number}" type="text" placeholder="여기를 터치해 답 입력" autocomplete="off" autocorrect="off" spellcheck="false">
+        <div class="quick-bar" id="qb_${p.number}" style="display:none;">
+          ${qbHTML.replace(/#NUM#/g, p.number)}
+        </div>
+      </div>`;
+  });
+
+  wrap.innerHTML = html;
+  document.getElementById('main').style.display = 'block';
+
+  // 입력창 터치 시 퀵버튼 표시 로직
+  examData.problems.forEach(p => {
+    const inp = document.getElementById('inp_' + p.number);
+    const qb = document.getElementById('qb_' + p.number);
+    inp.addEventListener('focus', () => { qb.style.display = 'flex'; });
+    inp.addEventListener('blur', () => { setTimeout(() => { qb.style.display = 'none'; }, 200); });
+  });
+}
+
+// ── 퀵버튼 삽입 ──
+function insertQuick(inputId, val) {
+  const el = document.getElementById(inputId);
+  if (!el || el.disabled) return;
+  const start = el.selectionStart || el.value.length;
+  const end = el.selectionEnd || el.value.length;
+  const v = el.value;
+  el.value = v.slice(0, start) + val + v.slice(end);
+  el.setSelectionRange(start + val.length, start + val.length);
+  el.focus();
+}
+
+// ── 정규화 (채점용) ──
+function norm(s) {
+  if (!s && s !== 0) return '';
+  return s.toString().trim().toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/\^2/g, '²').replace(/\^3/g, '³')
+    .replace(/×/g,'*').replace(/÷/g,'/')
+    .replace(/[（(]/g,'(').replace(/[）)]/g,')')
+    .replace(/[，,]/g,',').replace(/－/g,'-').replace(/＋/g,'+')
+    .replace(/①/g,'1').replace(/②/g,'2').replace(/③/g,'3')
+    .replace(/④/g,'4').replace(/⑤/g,'5');
+}
+
+// ── 채점하기 ──
+function submitAll() {
+  if (!examData) return;
+  let correct = 0;
+
+  examData.problems.forEach(p => {
+    const inp = document.getElementById('inp_' + p.number);
+    const card = document.getElementById('card_' + p.number);
+    const icon = document.getElementById('icon_' + p.number);
+    const qb = document.getElementById('qb_' + p.number);
+
+    const userAns = inp ? inp.value.trim() : '';
+    const corrAns = p.answer || '';
+    const ok = corrAns && norm(userAns) === norm(corrAns);
+
+    if (ok) correct++;
+    
+    // UI 업데이트
+    card.className = 'card ' + (ok ? 'correct' : 'wrong');
+    icon.textContent = ok ? '✅' : '❌';
+    icon.style.color = ok ? '#10B981' : '#EF4444';
+    if (inp) inp.disabled = true;
+    if (qb) qb.style.display = 'none';
+  });
+
+  const total = examData.problems.length;
+  const pct = Math.round(correct / total * 100);
+  
+  document.getElementById('rScore').textContent = correct;
+  document.getElementById('rTotal').textContent = '/ ' + total + '문제 정답';
+  document.getElementById('rMsg').textContent =
+    pct >= 90 ? '🎉 완벽해요!' :
+    pct >= 70 ? '👍 잘했어요!' :
+    pct >= 50 ? '💪 조금 더 노력해봐요!' : '😊 다시 도전해봐요!';
+
+  document.getElementById('main').style.display = 'none';
+  document.getElementById('result-screen').style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ── 결과 복사하기 (카톡 연동 핵심 로직) ──
+function copyResultCode() {
+  // A제목|B학생|1:답,2:답... 형태로 암호화 코드 생성
+  let ansStr = examData.problems.map(p => {
+    const inp = document.getElementById('inp_' + p.number);
+    return p.number + ':' + (inp ? inp.value.trim() : '');
+  }).join(',');
+  
+  const resultCode = 'A' + examData.title + '|B' + examData.student + '|' + ansStr;
+
+  // 클립보드 복사
+  navigator.clipboard.writeText(resultCode).then(() => {
+    alert('✅ 결과가 복사되었습니다!\n카카오톡을 열고 선생님께 붙여넣기로 보내주세요.');
+  }).catch(() => {
+    // 복사 권한이 없는 구형 브라우저 대비
+    prompt('아래 텍스트를 모두 복사해서 선생님께 보내주세요.', resultCode);
+  });
+}
+
+// ── 다시 풀기 ──
+function retryAll() {
+  examData.problems.forEach(p => {
+    const inp = document.getElementById('inp_' + p.number);
+    const card = document.getElementById('card_' + p.number);
+    const icon = document.getElementById('icon_' + p.number);
+    
+    // 틀린 문제만 다시 풀 수 있도록 활성화
+    if (card && card.classList.contains('wrong')) {
+      if (inp) { inp.value = ''; inp.disabled = false; }
+      card.className = 'card';
+      if (icon) icon.textContent = '';
+    }
+  });
+  
+  document.getElementById('result-screen').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>
